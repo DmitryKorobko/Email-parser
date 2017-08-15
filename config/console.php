@@ -26,7 +26,6 @@ $config = [
                     'class'          => 'yii\log\FileTarget',
                     'levels'         => ['error', 'warning'],
                     'logFile'        => '@app/runtime/logs/parser.log',
-                    'prefix'         => function () { return 'Parsing error - ';},
                     'exportInterval' => 1,
                     'maxFileSize'    => 1024 * 2,
                     'maxLogFiles'    => 20,
@@ -36,13 +35,12 @@ $config = [
                     'class'      => 'yii\log\EmailTarget',
                     'mailer'     => 'mailer',
                     'levels'     => ['error'],
-                    'prefix'         => function () { return 'Parsing error - ';},
                     'message'    => [
                         'from'    => ['order@laxa24.com'],
                         'to'      => ['support@laxa24.com'],
-                        'subject' => 'parsing error',
+                        'subject' => 'Parsing Error',
                     ],
-                    'logVars'     => []
+                    'logVars'    => []
                 ],
             ],
         ],
@@ -62,7 +60,9 @@ $config = [
             'class' => \app\modules\parser\components\MessageDispatcher::class,
             'parsers' => [
                 \app\modules\parser\services\ParserClorder::class,
-                \app\modules\parser\services\ParserMaitred::class,
+                \app\modules\parser\services\ParserEat24::class,
+                \app\modules\parser\services\ParserGrubhub::class,
+                \app\modules\parser\services\ParserEatStreet::class,
             ]
         ],
         'messageValidator' => [

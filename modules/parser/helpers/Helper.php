@@ -62,10 +62,41 @@ class Helper
         }
 
         $result = '';
-
-        if (is_array($lines)) {
+        if (is_array($lines) && !empty($lines)) {
             foreach ($lines as $line) {
                 $result[] = 'qty: ' . $line['qtyValue'] . ', item: ' .  $line['itemValue'] . ', price: ' . $line['priceValue'] . ' \\n';
+            }
+
+            return implode('', $result);
+        }
+
+        return $result;
+    }
+
+    /** Method of transferring words to a new line
+    *
+    * @param $str
+    * @return string
+    */
+    public static function wordWrappingForNoteByEatstreet($str)
+    {
+        $str = preg_replace('~\bItems|Price\b~', '', $str);
+        preg_match_all('~[\d.]+\s{2}+~', $str, $price);
+
+        $str = preg_replace('~[\d.]+\s{2}+~', ',', $str);
+        $items = explode(',', $str);
+
+        $count = 0;
+        if (isset($price) && is_array($price)) {
+            $price = array_shift($price);
+            $count = count($price);
+        }
+
+        $result = '';
+        if ($count) {
+            while ($count) {
+                $result[] = 'Items: ' . trim(array_shift($items)) . ', ' . 'Price: ' . trim(array_shift($price)) . '\\n';
+                $count --;
             }
 
             return implode('', $result);

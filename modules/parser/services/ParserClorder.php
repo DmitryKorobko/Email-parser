@@ -2,6 +2,7 @@
 
 namespace app\modules\parser\services;
 
+use app\modules\parser\exceptions\ServerException;
 use app\modules\parser\helpers\Helper;
 use app\modules\parser\interfaces\ParserInterface;
 use app\modules\parser\models\Logs;
@@ -43,6 +44,7 @@ class ParserClorder implements ParserInterface
      * @param Mailbox $mailbox
      * @return array
      * @throws Exception
+     * @throws ServerException
      */
     public function run($message, Mailbox $mailbox)
     {
@@ -56,6 +58,9 @@ class ParserClorder implements ParserInterface
                     'orderId' => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
+            } catch (ServerException $e) {
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
+                throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
                 Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
                 throw new Exception($e->getMessage());
@@ -114,7 +119,8 @@ class ParserClorder implements ParserInterface
                 $crawler->filter('td[style="padding: 0 5pt 7.5pt 0; width: 400px"]')->text())),
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
-            'order_number'        => $crawler->filter('div > span > b')->first()->text()
+            'order_number'        => $crawler->filter('div > span > b')->first()->text(),
+            'message_body'        => $message->textHtml
         ];
     }
 }

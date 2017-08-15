@@ -2,6 +2,7 @@
 
 namespace app\modules\parser\components;
 
+use app\modules\parser\exceptions\ServerException;
 use \yii\base\Component;
 
 /**
@@ -21,7 +22,7 @@ class ApiClient extends Component
      */
     public function generateRequestHref($data, $sourceType)
     {
-        $url = \Yii::$app->params['serverHost'] . '/v1pro/external/order/create?source_type=clorder' .
+        $url = \Yii::$app->params['serverHost'] . '/v1pro/external/order/create?source_type=' . $sourceType .
             '&access_token=' . \Yii::$app->params['access_tokens'][$sourceType];
 
         $url .= '&source_type=' . $sourceType;
@@ -37,7 +38,10 @@ class ApiClient extends Component
 
         $url .= '&customer_name=' . $data['customer_name'];
         $url .= '&customer_phone_num=' . $data['customer_phone_num'];
-        $url .= '&customer_address=' . $data['customer_address'];
+
+        if (!empty($data['customer_address'])) {
+            $url .= '&customer_address=' . $data['customer_address'];
+        }
 
         if (!empty($data['customer_notes'])) {
             $url .= '&customer_notes=' . $data['customer_notes'];
@@ -46,6 +50,7 @@ class ApiClient extends Component
         $url .= '&order_note=' . $data['order_note'];
         $url .= '&order_note_payments=' . $data['order_note_payments'];
         $url .= '&order_number=' . $data['order_number'];
+//        $url .= '&source_email="' . $data['message_body'] . '"';
 
         return $url;
     }
@@ -64,6 +69,7 @@ class ApiClient extends Component
         curl_setopt($cl, CURLOPT_URL, $href);
         curl_setopt($cl, CURLOPT_RETURNTRANSFER, 1);
         $line = curl_exec($cl);
+
         $result = json_decode($line);
         curl_close($cl);
 
@@ -71,9 +77,12 @@ class ApiClient extends Component
             return $result->data->order_id;
         } else {
             if (isset($result->status) && $result->status === 'error') {
-                throw new \Exception('An error has occurred: ' . $result->message);
+                throw new ServerException($href, 'An error has occurred: ' . $result->message);
             }
-            throw new \Exception('An error has occurred: ' . $line);
+            if ($line === false) {
+                throw new ServerException($href, 'An error has occurred: Curl error.');
+            }
+            throw new ServerException($href, 'An error has occurred: ' . $line);
         }
     }
 }

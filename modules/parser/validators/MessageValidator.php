@@ -15,7 +15,8 @@ class MessageValidator extends Component
     public function ValidateTextOfLetter($content)
     {
         if (!(strpos(mb_strtolower($content), 'pickup'))) {
-            if (strpos(mb_strtolower($content), 'delivery')) {
+            if ((strpos(mb_strtolower($content), 'delivery'))
+                || (strpos(mb_strtolower($content), 'deliver'))) {
                 return true;
             }
         }
