@@ -51,18 +51,18 @@ class ParserGrubhub implements ParserInterface
         if (Yii::$app->messageValidator->validateTextOfLetter($message->textPlain)) {
             try {
                 $data = $this->parserEmailMessage($message);
-                $href = \Yii::$app->apiClient->generateRequestHref($data, self::SOURCE_TYPE);
-                $orderId = \Yii::$app->apiClient->sendApiRequest($href);
+                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $orderId = Yii::$app->apiClient->sendApiRequest($href, $data, self::SOURCE_TYPE);
                 return [
                     'href' => $href,
                     'orderId' => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
             } catch (ServerException $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
                 throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
                 throw new Exception($e->getMessage());
             }
         } else {
@@ -96,16 +96,20 @@ class ParserGrubhub implements ParserInterface
 
         $order_tip = substr(stristr($crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)
             ->childNodes->item(3)->childNodes->item(1)->textContent, '$'), 1);
+        $order_tip = (!$order_tip) ? '0.00' : $order_tip;
         $order_tip_type = (!strpos($crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)
             ->childNodes->item(3)->childNodes->item(1)->textContent, '$')) ? 'cash' : "prepaid";
 
         $order_type = 'prepaid';
-        if (!stripos(mb_strtolower($crawler->filter('div > div > span')->last()->text()),'prepaid')) {
+        $is_prepaid = stristr($crawler->filter('div > div > span')->last()->text(), 'Prepaid');
+        if (empty($is_prepaid)) {
             $order_type = 'cash';
         }
 
         $order_number = substr(stristr($crawler->filter('div[id="cust_service_info"]')
             ->text(), '#'), 1, 10);
+
+        $customer_phone_number =  $crawler->filter('table > tbody > tr > td')->getNode(7)->textContent;
 
         return [
             'provider_ext_code'   => $crawler->filter('div > div > span')->first()->text(),
@@ -114,7 +118,7 @@ class ParserGrubhub implements ParserInterface
             'order_time'          => substr($crawler->filter('table > tbody > tr > td')->getNode(5)->childNodes->item(0)->textContent, 4,
                 strlen($crawler->filter('table > tbody > tr > td')->getNode(5)->childNodes->item(0)->textContent) - 5),
             'customer_name'       => $crawler->filter('table > tbody > tr > td')->getNode(2)->textContent,
-            'customer_phone_num'  => $crawler->filter('table > tbody > tr > td')->getNode(7)->textContent,
+            'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_phone_number),
             'customer_address'    => $customer_address,
             'customer_notes'      => $customer_notes,
             'order_note'          => Helper::wordWrappingForNote(

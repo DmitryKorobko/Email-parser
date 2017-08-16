@@ -104,4 +104,21 @@ class Helper
 
         return $result;
     }
+
+    /** Method of deleting NaN symbols from phone number
+     *
+     * @param $num
+     * @return string
+     */
+    public static function deleteNaNFromTelNum($num)
+    {
+        $number = '';
+        for ($i =0; $i < strlen($num); $i++) {
+            if (is_numeric($num[$i])) {
+                $number .= $num[$i];
+            }
+        }
+
+        return $number;
+    }
 }

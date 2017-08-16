@@ -51,18 +51,18 @@ class ParserClorder implements ParserInterface
         if (Yii::$app->messageValidator->validateTextOfLetter($message->textPlain)) {
             try {
                 $data = $this->parserEmailMessage($message);
-                $href = \Yii::$app->apiClient->generateRequestHref($data, self::SOURCE_TYPE);
-                $orderId = \Yii::$app->apiClient->sendApiRequest($href);
+                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $orderId = Yii::$app->apiClient->sendApiRequest($href, $data, self::SOURCE_TYPE);
                 return [
                     'href' => $href,
                     'orderId' => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
             } catch (ServerException $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
                 throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
                 throw new Exception($e->getMessage());
             }
         } else {
@@ -83,12 +83,18 @@ class ParserClorder implements ParserInterface
         $crawler = new Crawler($html);
 
         $customer_address = $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
-            > div[style="padding: 0; border-right: 1pt solid #000;"] div')->getNode(5)->textContent;
+            > div[style="padding: 0; border-right: 1pt solid #000;"] > div > div > span')->getNode(2)->textContent . ', '
+            . $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
+            > div[style="padding: 0; border-right: 1pt solid #000;"] > div > div > span')->getNode(3)->textContent;
+
+        $customer_address = str_replace(' ,', ',', $customer_address);
 
         $order_tip = str_replace('$', '',
             $crawler->filter('td[style="padding: 0 5pt 7.5pt 0; width: 400px"] > table > tbody')->children()
                 ->last()->children()->last()->text());
-        $order_tip_type = ($order_tip === 'cash') ? 'cash' : "prepaid";
+        $order_tip_type = (($order_tip === 'cash') || ($order_tip === 'CASH') || ($order_tip === 'Cash') ||
+            ($order_tip === ' cash ') || ($order_tip === ' CASH ') || ($order_tip === ' Cash ')) ? 'cash' : "prepaid";
+        $order_tip = ($order_tip_type === 'cash') ? '0.00' : str_replace(' ', '', $order_tip);
 
         $order_type = 'prepaid';
         if (!stripos($crawler->filter('td[style="width: 300px; padding: 0 0 7.5pt 0;"] > div')->children()->last()->text(),
@@ -97,14 +103,16 @@ class ParserClorder implements ParserInterface
             $order_type = 'cash';
         }
 
+        $customer_pnone_nubmer =  $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
+                span[ style="font-size: 16pt;"] > b')->text();
+
         return [
             'provider_ext_code'   => preg_replace('#-.*#', '', $crawler->filter('div > span > b')->first()->text()),
             'place'               => $crawler->filter('div > span[style="font-size: 10pt;"]')->text(),
             'restaurant'          => $crawler->filter('div > span[style="font-size: 18pt; alignment-adjust: central"]')->text(),
             'order_time'          => $crawler->filter('td[style="padding: 7.5pt 9pt; border-style: none;"]')->children()->last()->text(),
             'customer_name'       => $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"] span[ style="font-size: 14pt;"]')->text(),
-            'customer_phone_num'  => $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
-                span[ style="font-size: 16pt;"] > b')->text(),
+            'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_pnone_nubmer),
             'customer_address'    => $customer_address,
             'customer_notes'      => preg_replace('/\s{2}/', '',
                 $crawler->filter('td[style="padding: 7.5pt 11.25pt; border-style: none;"]')->children()->last()->text()),

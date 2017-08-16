@@ -2,6 +2,7 @@
 
 namespace app\modules\parser\services;
 
+use app\modules\parser\exceptions\ServerException;
 use app\modules\parser\helpers\Helper;
 use app\modules\parser\interfaces\ParserInterface;
 use app\modules\parser\models\Logs;
@@ -43,21 +44,25 @@ class ParserEatStreet implements ParserInterface
      * @param Mailbox $mailbox
      * @return array
      * @throws Exception
+     * @throws ServerException
      */
     public function run($message, Mailbox $mailbox)
     {
         if (Yii::$app->messageValidator->validateTextOfLetter($message->textPlain)) {
             try {
-                $data = $this->parserEmailMessage($message);
-                $href = \Yii::$app->apiClient->generateRequestHref($data, self::SOURCE_TYPE);
-                $orderId = \Yii::$app->apiClient->sendApiRequest($href);
+                $data = $this->parserEmailMessage($message); var_dump($data); exit;
+                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $orderId = Yii::$app->apiClient->sendApiRequest($href, $data, self::SOURCE_TYPE);
                 return [
                     'href' => $href,
                     'orderId' => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
+            } catch (ServerException $e) {
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null]);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
                 throw new Exception($e->getMessage());
             }
         } else {
@@ -82,14 +87,22 @@ class ParserEatStreet implements ParserInterface
         $customer_address .= $crawler->filter('div#page')->children()->getNode(2)->firstChild->firstChild->childNodes
             ->item(2)->childNodes->item(7)->textContent;
 
+        $customer_address = str_replace(' Apt:', ',', $customer_address);
+        $customer_address = str_replace('Apt:', ',', $customer_address);
+
         $order_tip = trim($crawler->filter('div#page')->children()->getNode(16)->getElementsByTagName('td')
             ->item(12)->textContent);
-        $order_tip_type = ($order_tip === 'cash') ? 'cash' : "prepaid";
+        $order_tip_type = (($order_tip === 'cash') || ($order_tip === 'CASH') || ($order_tip === 'Cash') ||
+            ($order_tip === ' cash ') || ($order_tip === ' CASH ') || ($order_tip === ' Cash ')) ? 'cash' : "prepaid";
+        $order_tip = ($order_tip_type === 'cash') ? '0.00' : $order_tip;
 
         $order_type = 'prepaid';
         if (!stripos($crawler->filter('div#orderInfo')->text(), 'paid')) {
             $order_type = 'cash';
         }
+
+        $customer_pnone_nubmer = $crawler->filter('div#page')->children()->getNode(2)->firstChild->firstChild
+            ->firstChild->childNodes->item(6)->textContent;
 
         return [
             'provider_ext_code'   => trim($crawler->filter('div#page tr > td')->children()->getNode(2)->textContent),
@@ -97,8 +110,7 @@ class ParserEatStreet implements ParserInterface
             'sanzab'              => trim($crawler->filter('div#page tr > td')->children()->getNode(2)->textContent),
             'customer_name'       => trim($crawler->filter('div#page')->children()->getNode(2)->firstChild->firstChild
                 ->firstChild->childNodes->item(3)->textContent),
-            'customer_phone_num'  => $crawler->filter('div#page')->children()->getNode(2)->firstChild->firstChild
-                ->firstChild->childNodes->item(6)->textContent,
+            'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_pnone_nubmer),
             'customer_address'    => trim($customer_address),
             'customer_notes'      => '', //todo сделать
             'order_note'          => Helper::wordWrappingForNoteByEatstreet(preg_replace('~\*~', '',

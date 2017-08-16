@@ -13,6 +13,7 @@ use yii\db\ActiveRecord;
  * @property integer $id
  * @property string $subject
  * @property string $href
+ * @property string $html
  * @property string $unique_message_identifier
  * @property string $sender
  * @property integer $complete
@@ -63,7 +64,7 @@ class Logs extends ActiveRecord
                 'required',
                 'on' => [self::SCENARIO_CREATE, self::SCENARIO_UPDATE]
             ],
-            [['unique_message_identifier', 'sender', 'message_error', 'href'], 'string'],
+            [['unique_message_identifier', 'sender', 'message_error', 'href', 'html'], 'string'],
             [[ 'created_at', 'updated_at', 'complete', 'order_id'], 'integer'],
         ];
     }
@@ -75,9 +76,10 @@ class Logs extends ActiveRecord
      * @param $complete
      * @param $messageError
      * @param $data
+     * @param $html
      * @return bool
      */
-    public static function recordLog($message, $complete, $messageError, $data)
+    public static function recordLog($message, $complete, $messageError, $data, $html = null)
     {
         $logs = new self();
         $logs->setScenario(self::SCENARIO_CREATE);
@@ -89,6 +91,7 @@ class Logs extends ActiveRecord
             'message_date'              => strtotime($message->date),
             'order_id'                  => (isset($data['orderId'])) ? $data['orderId'] : null,
             'href'                      => (isset($data['href'])) ? $data['href'] : null,
+            'html'                      => $html,
             'message_error'             => $messageError
         ];
 
