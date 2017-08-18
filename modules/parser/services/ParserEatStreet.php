@@ -48,24 +48,33 @@ class ParserEatStreet implements ParserInterface
      */
     public function run($message, Mailbox $mailbox)
     {
-        if (Yii::$app->messageValidator->validateTextOfLetter($message->textPlain)) {
+        $messageText = ($message->textPlain) ? $message->textPlain : $message->textHtml;
+
+        if (Yii::$app->messageValidator->validateTextOfLetter($messageText)) {
             try {
-                $data = $this->parserEmailMessage($message); var_dump($data); exit;
+                $data = $this->parserEmailMessage($message);
+
                 $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+
+                $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
+                    Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));
+
                 $orderId = Yii::$app->apiClient->sendApiRequest($href, $data, self::SOURCE_TYPE);
+
                 return [
-                    'href' => $href,
-                    'orderId' => $orderId,
+                    'href'         => $logsHref,
+                    'orderId'      => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
             } catch (ServerException $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => $e->href], $message->textHtml);
                 throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($logsHref)) ? $logsHref : null], $message->textHtml);
                 throw new Exception($e->getMessage());
             }
         } else {
+            Logs::recordLog($message, 0, 'no validate', ['href' => (isset($logsHref)) ? $logsHref : null], $message->textHtml);
             $mailbox->moveMail($message->id, self::EMAIL_FOLDER);
         }
     }
@@ -106,8 +115,8 @@ class ParserEatStreet implements ParserInterface
 
         return [
             'provider_ext_code'   => trim($crawler->filter('div#page tr > td')->children()->getNode(2)->textContent),
-            'date'                => $crawler->filter('div#page tr > td')->children()->last()->text(),
-            'sanzab'              => trim($crawler->filter('div#page tr > td')->children()->getNode(2)->textContent),
+            'place'               => $crawler->filter('div#page tr > td')->children()->last()->text(),
+            'restaurant'          => trim($crawler->filter('div#page tr > td')->children()->getNode(2)->textContent),
             'customer_name'       => trim($crawler->filter('div#page')->children()->getNode(2)->firstChild->firstChild
                 ->firstChild->childNodes->item(3)->textContent),
             'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_pnone_nubmer),

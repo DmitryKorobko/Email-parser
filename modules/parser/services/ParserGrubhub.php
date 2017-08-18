@@ -48,24 +48,33 @@ class ParserGrubhub implements ParserInterface
      */
     public function run($message, Mailbox $mailbox)
     {
-        if (Yii::$app->messageValidator->validateTextOfLetter($message->textPlain)) {
+        $messageText = ($message->textPlain) ? $message->textPlain : $message->textHtml;
+
+        if (Yii::$app->messageValidator->validateTextOfLetter($messageText)) {
             try {
                 $data = $this->parserEmailMessage($message);
-                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+
+                $href = Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+
+                $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
+                    Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));
+
                 $orderId = Yii::$app->apiClient->sendApiRequest($href, $data, self::SOURCE_TYPE);
+
                 return [
-                    'href' => $href,
-                    'orderId' => $orderId,
+                    'href'         => $logsHref,
+                    'orderId'      => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
             } catch (ServerException $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => $e->href], $message->textHtml);
                 throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($logsHref)) ? $logsHref : null], $message->textHtml);
                 throw new Exception($e->getMessage());
             }
         } else {
+            Logs::recordLog($message, 0, 'no validate', ['href' => (isset($logsHref)) ? $logsHref : null], $message->textHtml);
             $mailbox->moveMail($message->id, self::EMAIL_FOLDER);
         }
     }
@@ -81,27 +90,22 @@ class ParserGrubhub implements ParserInterface
         $html = $message->textHtml;
         $crawler = new Crawler($html);
 
-        $customer_notes = '';
-        $customer_address =
-            $crawler->filter('div[style="display:none; display: none !important;"] > div')->children()->getNode(2)->textContent
-            . ', ' . $crawler->filter('div[style="display:none; display: none !important;"] > div')->children()->getNode(3)->textContent
-            . ', ' . $crawler->filter('div[style="display:none; display: none !important;"] > div')->children()->getNode(4)->textContent
-            . ', ' . $crawler->filter('div[style="display:none; display: none !important;"] > div')->children()->getNode(5)->textContent
-            . ', ' . $crawler->filter('div[style="display:none; display: none !important;"] > div')->children()->getNode(6)->textContent;
+        $customer_notes = $crawler->filter('div > div[data-field="special-instructions"]')->text();
+        $customer_address = $crawler->filter('div > div[data-field="address1"]')->text()
+            . ', ' . $crawler->filter('div > div[data-field="address2"]')->text()
+            . ', ' . $crawler->filter('div > div[data-field="city"]')->text()
+            . ', ' . $crawler->filter('div > div[data-field="state"]')->text()
+            . ', ' . $crawler->filter('div > div[data-field="zip"]')->text();
+        $customer_address = str_replace(' ,', '', $customer_address);
 
-        if ((strpos(mb_strtolower($html), 'special instructions'))) {
-            $customer_notes = preg_replace('/\s{2}/', '', $crawler
-                ->filter('table[style="width:400px; border:1px solid black;"] > tbody > tr > td')->last()->text());
-        }
-
-        $order_tip = substr(stristr($crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)
-            ->childNodes->item(3)->childNodes->item(1)->textContent, '$'), 1);
-        $order_tip = (!$order_tip) ? '0.00' : $order_tip;
-        $order_tip_type = (!strpos($crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)
-            ->childNodes->item(3)->childNodes->item(1)->textContent, '$')) ? 'cash' : "prepaid";
+        $order_tip = $crawler->filter('div > div[data-field="tip"]')->text();
+        $is_cash = ($crawler->filter('div > div[data-field="tip-payment-is-cash"]')->text() == 'false') ? false : true;
+        $order_tip = ($is_cash) ? '0.00' : $order_tip;
+        $order_tip_type = ($is_cash) ? 'cash' : "prepaid";
 
         $order_type = 'prepaid';
-        $is_prepaid = stristr($crawler->filter('div > div > span')->last()->text(), 'Prepaid');
+        $is_prepaid = stristr($crawler->filter('div > span[style="font-weight:bold; font-size:150%;"]')->last()
+            ->text(), 'Prepaid');
         if (empty($is_prepaid)) {
             $order_type = 'cash';
         }
@@ -109,31 +113,28 @@ class ParserGrubhub implements ParserInterface
         $order_number = substr(stristr($crawler->filter('div[id="cust_service_info"]')
             ->text(), '#'), 1, 10);
 
-        $customer_phone_number =  $crawler->filter('table > tbody > tr > td')->getNode(7)->textContent;
+        $customer_phone_number =  $crawler->filter('div > div[data-field="phone"]')->text();
 
         return [
-            'provider_ext_code'   => $crawler->filter('div > div > span')->first()->text(),
-            'place'               => $crawler->filter('table > tbody > tr > td')->getNode(3)->childNodes->item(0)->textContent,
-            'restaurant'          => $crawler->filter('div > div > span')->first()->text(),
-            'order_time'          => substr($crawler->filter('table > tbody > tr > td')->getNode(5)->childNodes->item(0)->textContent, 4,
-                strlen($crawler->filter('table > tbody > tr > td')->getNode(5)->childNodes->item(0)->textContent) - 5),
-            'customer_name'       => $crawler->filter('table > tbody > tr > td')->getNode(2)->textContent,
+            'provider_ext_code'   => $crawler
+                ->filter('div[id="cust_service_info"] > span[style="font-weight:bold; font-size:150%;"]')->text(),
+            'place'               => $crawler->filter('table[style="width:400px;"] > tr > td')->getNode(3)->textContent,
+            'restaurant'          => $crawler->filter('div[data-field="restaurant-name"]')->text(),
+            'order_time'          => $crawler->filter('table > tr > td[valign="top"]')->text(),
+            'customer_name'       => $crawler->filter('div > div[data-field="name"]')->text(),
             'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_phone_number),
             'customer_address'    => $customer_address,
             'customer_notes'      => $customer_notes,
-            'order_note'          => Helper::wordWrappingForNote(
-                $crawler->filter('table[style="width:500px; border:1px solid black;"] > tbody')->children()),
-            'order_price'         => str_replace('$', '',
-                $crawler->filter('table[style="width:400px;"] > tbody > tr > td')->last()->text()),
-            'order_tip'           => preg_replace('/\s{2}/', '', $order_tip),
+            'order_note'          => Helper::wordWrappingForNoteByGrubHub($crawler->filter('table[style="width:500px; border:1px solid black;"] > tr >td')),
+            'order_price'         => $crawler->filter('div[data-field="total"]')->text(),
+            'order_tip'           => $order_tip,
             'order_tip_type'      => $order_tip_type,
             'order_type'          => $order_type,
-            'order_note_payments' => Helper::wordWrappingForPayments(preg_replace('/\n\s{2}/', ' ',
-                ($crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)->childNodes->item(0)->textContent . ' ' .
-                    $crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)->childNodes->item(1)->textContent . ' ' .
-                    $crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)->childNodes->item(2)->textContent . ' ' .
-                    $crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)->childNodes->item(3)->textContent . ' ' .
-                    $crawler->filter('table[style="width:400px;"] > tbody')->getNode(1)->childNodes->item(4)->textContent))),
+            'order_note_payments' => 'Subtotal $' . $crawler->filter('div[data-field="subtotal"]')->text() . '\n ' .
+                'Delivery Fee $' . $crawler->filter('div[data-field="delivery-charge"]')->text() . '\n ' .
+                'Tax $' . $crawler->filter('div[data-field="sales-tax"]')->text() . '\n ' .
+                'Tip $' . $crawler->filter('div[data-field="tip"]')->text() . '\n ' .
+                'Total $' . $crawler->filter('div[data-field="total"]')->text() . '\n',
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
             'order_number'        => $order_number,

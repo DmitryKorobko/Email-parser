@@ -121,4 +121,42 @@ class Helper
 
         return $number;
     }
+
+    /** Method of transferring words to a new line
+     *
+     * @param $str
+     * @return string
+     */
+    public static function wordWrappingForNoteByGrubHub($str)
+    {
+        $table = [];
+        foreach ($str as $item) {
+            if ($item->textContent !== "") {
+                $table[] = $item->textContent;
+            }
+        }
+
+        $lengtOfArray = count($table);
+        $result ='';
+
+        for ($i = 0; $i < $lengtOfArray; $i++) {
+            if (is_numeric($table[$i])) {
+                $result .= ' qty: ' . $table[$i] . ' item: ' . $table[$i + 1];
+
+                if ((($i + 3) <= ($lengtOfArray - 1)) && !is_numeric($table[$i + 3])) {
+                    $result .= ' ' . $table[$i + 3];
+                }
+
+                if ((($i + 3) <= ($lengtOfArray - 1)) && (($i + 4) <= ($lengtOfArray - 1))
+                    && (($i + 5) <= ($lengtOfArray - 1)) && !is_numeric($table[$i + 3])
+                    && !is_numeric($table[$i + 4]) && !is_numeric($table[$i + 5])) {
+                    $result .= ' ' . $table[$i + 5];
+                }
+
+                $result .= ' price: ' . $table[$i + 2] . ' \n';
+            }
+        }
+
+        return $result;
+    }
 }

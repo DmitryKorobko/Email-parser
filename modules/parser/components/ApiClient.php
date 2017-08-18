@@ -94,12 +94,49 @@ class ApiClient extends Component
             return $result->data->order_id;
         } else {
             if (isset($result->status) && $result->status === 'error') {
-                throw new ServerException($href, 'An error has occurred: ' . $result->message);
+                throw new ServerException($this->generateHrefForLogs($href, $request_array), 'An error has occurred: ' . $result->message);
             }
             if ($line === false) {
-                throw new ServerException($href, 'An error has occurred: Curl error.');
+                throw new ServerException($this->generateHrefForLogs($href, $request_array), 'An error has occurred: Curl error.');
             }
-            throw new ServerException($href, 'An error has occurred: ' . $line);
+            throw new ServerException($this->generateHrefForLogs($href, $request_array), 'An error has occurred: ' . $line);
         }
+    }
+
+    /**
+     * Метод формирования ссылки для логов
+     *
+     * @param $url
+     * @param $data
+     * @return string
+     */
+    public function generateHrefForLogs($url, $data)
+    {
+        $url .= '&source_type=' . $data['source_type'];
+        $url .= '&provider_ext_code=' . $data['provider_ext_code'];
+        $url .= '&order_kind=normal';
+        $url .= '&order_type=' . $data['order_type'];
+        $url .= '&order_tip_type=' . $data['order_tip_type'];
+        $url .= '&order_price=' . $data['order_price'];
+
+        if ($data['order_tip'] !== 'cash') {
+            $url .= '&order_tip=' . $data['order_tip'];
+        }
+
+        $url .= '&customer_name=' . $data['customer_name'];
+        $url .= '&customer_phone_num=' . $data['customer_phone_num'];
+
+        if (!empty($data['customer_address'])) {
+            $url .= '&customer_address=' . $data['customer_address'];
+        }
+
+        if (!empty($data['customer_notes'])) {
+            $url .= '&customer_notes=' . $data['customer_notes'];
+        }
+
+        $url .= '&order_note=' . $data['order_note'];
+        $url .= '&order_note_payments=' . $data['order_note_payments'];
+        $url .= '&order_number=' . $data['order_number'];
+        return $url;
     }
 }

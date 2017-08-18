@@ -25,6 +25,7 @@ $config = [
                 [
                     'class'          => 'yii\log\FileTarget',
                     'levels'         => ['error', 'warning'],
+                    'categories' => ['parser'],
                     'logFile'        => '@app/runtime/logs/parser.log',
                     'exportInterval' => 1,
                     'maxFileSize'    => 1024 * 2,
@@ -35,6 +36,7 @@ $config = [
                     'class'      => 'yii\log\EmailTarget',
                     'mailer'     => 'mailer',
                     'levels'     => ['error'],
+                    'categories' => ['parser'],
                     'message'    => [
                         'from'    => ['order@laxa24.com'],
                         'to'      => ['support@laxa24.com'],

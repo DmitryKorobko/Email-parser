@@ -48,24 +48,33 @@ class ParserClorder implements ParserInterface
      */
     public function run($message, Mailbox $mailbox)
     {
-        if (Yii::$app->messageValidator->validateTextOfLetter($message->textPlain)) {
+        $messageText = ($message->textPlain) ? $message->textPlain : $message->textHtml;
+
+        if (Yii::$app->messageValidator->validateTextOfLetter($messageText)) {
             try {
                 $data = $this->parserEmailMessage($message);
-                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+
+                $href = Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+
+                $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
+                    Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));
+
                 $orderId = Yii::$app->apiClient->sendApiRequest($href, $data, self::SOURCE_TYPE);
+
                 return [
-                    'href' => $href,
-                    'orderId' => $orderId,
+                    'href'         => $logsHref,
+                    'orderId'      => $orderId,
                     'email_folder' => self::EMAIL_FOLDER
                 ];
             } catch (ServerException $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => $e->href], $message->textHtml);
                 throw new ServerException($e->href, $e->getMessage());
             } catch (\Exception $e) {
-                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($href)) ? $href : null], $message->textHtml);
+                Logs::recordLog($message, 0, $e->getMessage(), ['href' => (isset($logsHref)) ? $logsHref : null], $message->textHtml);
                 throw new Exception($e->getMessage());
             }
         } else {
+            Logs::recordLog($message, 0, 'no validate', ['href' => (isset($logsHref)) ? $logsHref : null], $message->textHtml);
             $mailbox->moveMail($message->id, self::EMAIL_FOLDER);
         }
     }
@@ -82,12 +91,10 @@ class ParserClorder implements ParserInterface
         $html = $message->textHtml;
         $crawler = new Crawler($html);
 
-        $customer_address = $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
-            > div[style="padding: 0; border-right: 1pt solid #000;"] > div > div > span')->getNode(2)->textContent . ', '
-            . $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
-            > div[style="padding: 0; border-right: 1pt solid #000;"] > div > div > span')->getNode(3)->textContent;
-
-        $customer_address = str_replace(' ,', ',', $customer_address);
+        $customer_address = trim($crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
+            > div[style="padding: 0; border-right: 1pt solid #000;"] > div > div > span')->getNode(2)->textContent)
+            . ' ' . trim($crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
+            > div[style="padding: 0; border-right: 1pt solid #000;"] > div > div > span')->getNode(3)->textContent);
 
         $order_tip = str_replace('$', '',
             $crawler->filter('td[style="padding: 0 5pt 7.5pt 0; width: 400px"] > table > tbody')->children()
@@ -98,7 +105,7 @@ class ParserClorder implements ParserInterface
 
         $order_type = 'prepaid';
         if (!stripos($crawler->filter('td[style="width: 300px; padding: 0 0 7.5pt 0;"] > div')->children()->last()->text(),
-            'Prepaid')
+            'paid')
         ) {
             $order_type = 'cash';
         }

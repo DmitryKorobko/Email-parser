@@ -64,7 +64,7 @@ class Logs extends ActiveRecord
                 'required',
                 'on' => [self::SCENARIO_CREATE, self::SCENARIO_UPDATE]
             ],
-            [['unique_message_identifier', 'sender', 'message_error', 'href', 'html'], 'string'],
+            [['unique_message_identifier', 'sender', 'message_error', 'href'], 'string'],
             [[ 'created_at', 'updated_at', 'complete', 'order_id'], 'integer'],
         ];
     }
