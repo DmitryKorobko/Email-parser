@@ -54,7 +54,7 @@ class ParserClorder implements ParserInterface
             try {
                 $data = $this->parserEmailMessage($message);
 
-                $href = Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $href = Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE, $data);
 
                 $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
                     Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));
@@ -112,6 +112,9 @@ class ParserClorder implements ParserInterface
 
         $customer_pnone_nubmer =  $crawler->filter('td[style="width: 40%; padding: 7.5pt 0; border-style: none;"]
                 span[ style="font-size: 16pt;"] > b')->text();
+        $order_number = $crawler->filter('div > span > b')->first()->text();
+        $query = Logs::findOne(['order_number' => $order_number]);
+        $is_update = (empty($query)) ? false : true;
 
         return [
             'provider_ext_code'   => preg_replace('#-.*#', '', $crawler->filter('div > span > b')->first()->text()),
@@ -134,8 +137,10 @@ class ParserClorder implements ParserInterface
                 $crawler->filter('td[style="padding: 0 5pt 7.5pt 0; width: 400px"]')->text())),
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
-            'order_number'        => $crawler->filter('div > span > b')->first()->text(),
-            'message_body'        => $message->textHtml
+            'order_number'        => $order_number,
+            'message_body'        => $message->textHtml,
+            'is_update'           => $is_update,
+            'confirmation_link'   => ''
         ];
     }
 }

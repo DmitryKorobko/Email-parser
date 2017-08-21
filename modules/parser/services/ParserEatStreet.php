@@ -134,7 +134,9 @@ class ParserEatStreet implements ParserInterface
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
             'order_number'        => preg_replace('~\D+~', '', $crawler->filter('div#page tr')->children()->last()->text()),
-            'message_body'        => $message->textHtml
+            'message_body'        => $message->textHtml,
+            'is_update'           => false,
+            'confirmation_link'   => $crawler->filter('body[class="fax_class"] > a')->first()->extract(['href'])[0]
         ];
     }
 }

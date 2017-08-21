@@ -99,7 +99,7 @@ class ParserGrubhub implements ParserInterface
         $customer_address = str_replace(' ,', '', $customer_address);
 
         $order_tip = $crawler->filter('div > div[data-field="tip"]')->text();
-        $is_cash = ($crawler->filter('div > div[data-field="tip-payment-is-cash"]')->text() == 'false') ? false : true;
+        $is_cash = (str_replace(' ', '', $crawler->filter('div > div[data-field="tip-payment-is-cash"]')->text()) == 'false') ? false : true;
         $order_tip = ($is_cash) ? '0.00' : $order_tip;
         $order_tip_type = ($is_cash) ? 'cash' : "prepaid";
 
@@ -138,7 +138,9 @@ class ParserGrubhub implements ParserInterface
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
             'order_number'        => $order_number,
-            'message_body'        => $message->textHtml
+            'message_body'        => $message->textHtml,
+            'is_update'           => false,
+            'confirmation_link'   => $crawler->filter('body[style="font-size:15px;"] > a[target="_blank"]')->extract(['href'])[0]
         ];
     }
 }

@@ -16,6 +16,7 @@ $config = [
     'basePath' => dirname(__DIR__),
     'bootstrap' => ['log'],
     'controllerNamespace' => 'app\commands',
+    'timeZone' => 'US/Pacific',
     'components' => [
         'cache' => [
             'class' => 'yii\caching\FileCache',
@@ -65,6 +66,7 @@ $config = [
                 \app\modules\parser\services\ParserEat24::class,
                 \app\modules\parser\services\ParserGrubhub::class,
                 \app\modules\parser\services\ParserEatStreet::class,
+                \app\modules\parser\services\ParserDelivery::class,
             ]
         ],
         'messageValidator' => [

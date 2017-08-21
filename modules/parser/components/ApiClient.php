@@ -17,12 +17,17 @@ class ApiClient extends Component
      * Метод формирования ссылки для отправки данных на сервер
      *
      * @param $sourceType
+     * @param $data
      * @return string
      */
-    public function generateRequestHref($sourceType)
+    public function generateRequestHref($sourceType, $data)
     {
-        $url = \Yii::$app->params['serverHost'] . '/v1pro/external/order/create?access_token='
-            . \Yii::$app->params['access_tokens'][$sourceType];
+        $url = \Yii::$app->params['serverHost'];
+
+        $url .= ($data['is_update']) ? '/v1pro/external/order/update?access_token=' .
+            \Yii::$app->params['access_tokens'][$sourceType] :
+            '/v1pro/external/order/create?access_token=' . \Yii::$app->params['access_tokens'][$sourceType]  .
+            '&order_ts_ready={AUTO}';
 
         return $url;
     }
@@ -37,32 +42,34 @@ class ApiClient extends Component
     public function generateRequestArray($data, $sourceType)
     {
         $request_array = [];
-        $request_array['source_type'] = $sourceType;
-        $request_array['provider_ext_code'] = $data['provider_ext_code'];
-        $request_array['order_kind'] = 'normal';
-        $request_array['order_type'] = $data['order_type'];
-        $request_array['order_tip_type'] = $data['order_tip_type'];
-        $request_array['order_price'] = $data['order_price'];
+
+        $request_array['source_type']          = $sourceType;
+        $request_array['provider_ext_code']    = $data['provider_ext_code'];
+        $request_array['order_kind']           = 'normal';
+        $request_array['order_type']           = $data['order_type'];
+        $request_array['order_tip_type']       = $data['order_tip_type'];
+        $request_array['order_price']          = $data['order_price'];
 
         if ($data['order_tip'] !== 'cash') {
-            $request_array['order_tip'] = $data['order_tip'];
+            $request_array['order_tip']        = $data['order_tip'];
         }
 
-        $request_array['customer_name'] = $data['customer_name'];
-        $request_array['customer_phone_num'] = $data['customer_phone_num'];
+        $request_array['customer_name']        = $data['customer_name'];
+        $request_array['customer_phone_num']   = $data['customer_phone_num'];
 
         if (!empty($data['customer_address'])) {
             $request_array['customer_address'] = $data['customer_address'];
         }
 
         if (!empty($data['customer_notes'])) {
-            $request_array['customer_notes'] = $data['customer_notes'];
+            $request_array['customer_notes']   = $data['customer_notes'];
         }
 
-        $request_array['order_note'] = $data['order_note'];
-        $request_array['order_note_payments'] = $data['order_note_payments'];
-        $request_array['order_number'] = $data['order_number'];
-        $request_array['source_email'] = $data['message_body'];
+        $request_array['order_note']           = $data['order_note'];
+        $request_array['order_note_payments']  = $data['order_note_payments'];
+        $request_array['order_number']         = $data['order_number'];
+        $request_array['source_email']         = $data['message_body'];
+        $request_array['confirmation_link']    = $data['confirmation_link'];
 
         return $request_array;
     }
@@ -134,9 +141,9 @@ class ApiClient extends Component
             $url .= '&customer_notes=' . $data['customer_notes'];
         }
 
-        $url .= '&order_note=' . $data['order_note'];
-        $url .= '&order_note_payments=' . $data['order_note_payments'];
         $url .= '&order_number=' . $data['order_number'];
+        $url .= '&confirmation_link=' . $data['confirmation_link'];
+
         return $url;
     }
 }

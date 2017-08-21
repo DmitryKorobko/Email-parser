@@ -137,7 +137,9 @@ class ParserEat24 implements ParserInterface
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
             'order_number'        => $crawler->filter('div[style="width: 100%; background:#ffffff;"] div[style="padding:3px 0"] > b')->text(),
-            'message_body'        => $message->textHtml
+            'message_body'        => $message->textHtml,
+            'is_update'           => false,
+            'confirmation_link'   => $crawler->filter('div[style="margin-bottom:10px; padding:17px 0; background:#0e83cd; font-size:14pt; text-align:center"] > a')->extract(['href'])[0]
         ];
     }
 }

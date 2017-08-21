@@ -136,24 +136,52 @@ class Helper
             }
         }
 
-        $lengtOfArray = count($table);
+        $lengthOfArray = count($table);
         $result ='';
 
-        for ($i = 0; $i < $lengtOfArray; $i++) {
+        for ($i = 0; $i < $lengthOfArray; $i++) {
             if (is_numeric($table[$i])) {
                 $result .= ' qty: ' . $table[$i] . ' item: ' . $table[$i + 1];
 
-                if ((($i + 3) <= ($lengtOfArray - 1)) && !is_numeric($table[$i + 3])) {
+                if ((($i + 3) <= ($lengthOfArray - 1)) && !is_numeric($table[$i + 3])) {
                     $result .= ' ' . $table[$i + 3];
                 }
 
-                if ((($i + 3) <= ($lengtOfArray - 1)) && (($i + 4) <= ($lengtOfArray - 1))
-                    && (($i + 5) <= ($lengtOfArray - 1)) && !is_numeric($table[$i + 3])
+                if ((($i + 3) <= ($lengthOfArray - 1)) && (($i + 4) <= ($lengthOfArray - 1))
+                    && (($i + 5) <= ($lengthOfArray - 1)) && !is_numeric($table[$i + 3])
                     && !is_numeric($table[$i + 4]) && !is_numeric($table[$i + 5])) {
                     $result .= ' ' . $table[$i + 5];
                 }
 
                 $result .= ' price: ' . $table[$i + 2] . ' \n';
+            }
+        }
+
+        return $result;
+    }
+
+    /** Method of transferring words to a new line
+     *
+     * @param $str
+     * @return string
+     */
+    public static function wordWrappingForNoteByDelivery($str)
+    {
+        $table = [];
+        foreach ($str as $item) {
+            if ($item->textContent !== "") {
+                $table[] = $item->textContent;
+            }
+        }
+
+        $lengthOfArray = count($table);
+        $result ='';
+
+        for ($i = 0; $i < $lengthOfArray; $i++) {
+            $result .= ' Qty: ' . $table[$i] . ' Item: ' . $table[$i + 1] . ' Price: ' . $table[$i + 2] . ' \n';
+
+            if (($i + 3) <= $lengthOfArray) {
+                $i += 2;
             }
         }
 
