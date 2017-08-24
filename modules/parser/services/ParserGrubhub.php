@@ -54,7 +54,7 @@ class ParserGrubhub implements ParserInterface
             try {
                 $data = $this->parserEmailMessage($message);
 
-                $href = Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $href = Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE, $data);
 
                 $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
                     Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));
@@ -99,7 +99,8 @@ class ParserGrubhub implements ParserInterface
         $customer_address = str_replace(' ,', '', $customer_address);
 
         $order_tip = $crawler->filter('div > div[data-field="tip"]')->text();
-        $is_cash = (str_replace(' ', '', $crawler->filter('div > div[data-field="tip-payment-is-cash"]')->text()) == 'false') ? false : true;
+        $tip_type_is_cash = str_replace(' ', '', $crawler->filter('div > div[data-field="tip"]')->text());
+        $is_cash = (($order_tip == '0.00') && ($tip_type_is_cash)) ? true : false;
         $order_tip = ($is_cash) ? '0.00' : $order_tip;
         $order_tip_type = ($is_cash) ? 'cash' : "prepaid";
 

@@ -54,7 +54,7 @@ class ParserEatStreet implements ParserInterface
             try {
                 $data = $this->parserEmailMessage($message);
 
-                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE, $data);
 
                 $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
                     Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));

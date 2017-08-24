@@ -71,6 +71,10 @@ class ApiClient extends Component
         $request_array['source_email']         = $data['message_body'];
         $request_array['confirmation_link']    = $data['confirmation_link'];
 
+        if (isset($data['order_api_id']) && $data['order_api_id'] !== null) {
+            $request_array['order_id'] = $data['order_api_id'];
+        }
+
         return $request_array;
     }
 
@@ -86,6 +90,7 @@ class ApiClient extends Component
     public function sendApiRequest($href, $data, $sourceType)
     {
         $request_array = $this->generateRequestArray($data, $sourceType);
+
         $cl = curl_init();
         curl_setopt($cl, CURLOPT_URL, $href);
         curl_setopt($cl, CURLOPT_POST, 1);
@@ -98,7 +103,7 @@ class ApiClient extends Component
         curl_close($cl);
 
         if ($result && $result->status === 'success') {
-            return $result->data->order_id;
+            return (isset($result->data) && isset($result->data->order_id)) ? $result->data->order_id : $request_array['order_id'];
         } else {
             if (isset($result->status) && $result->status === 'error') {
                 throw new ServerException($this->generateHrefForLogs($href, $request_array), 'An error has occurred: ' . $result->message);
@@ -139,6 +144,10 @@ class ApiClient extends Component
 
         if (!empty($data['customer_notes'])) {
             $url .= '&customer_notes=' . $data['customer_notes'];
+        }
+
+        if (isset($data['order_api_id']) && $data['order_api_id'] !== null) {
+            $url .= '&order_id=' . $data['order_api_id'];
         }
 
         $url .= '&order_number=' . $data['order_number'];

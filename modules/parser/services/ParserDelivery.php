@@ -52,7 +52,7 @@ class ParserDelivery implements ParserInterface
             try {
                 $data = $this->parserEmailMessage($message);
 
-                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE);
+                $href = \Yii::$app->apiClient->generateRequestHref(self::SOURCE_TYPE, $data);
 
                 $logsHref = Yii::$app->apiClient->generateHrefForLogs($href,
                     Yii::$app->apiClient->generateRequestArray($data, self::SOURCE_TYPE));
@@ -88,14 +88,19 @@ class ParserDelivery implements ParserInterface
         $html = $message->textHtml;
         $crawler = new Crawler($html);
 
-        $customer_address = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(6)->textContent . ', '
-            . $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(8)->textContent;
-
+        $customer_address = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(5)->textContent . ', ' .
+            $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(7)->textContent;
         $customer_address = str_replace(["\r", "\n", '#'], '', str_replace(', , ', ', ', str_replace(' ,', ',', $customer_address)));
+
+        if (strlen($customer_address) < 20) {
+            $customer_address = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(6)->textContent . ', ' .
+                $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(8)->textContent;
+            $customer_address = str_replace(["\r", "\n", '#'], '', str_replace(', , ', ', ', str_replace(' ,', ',', $customer_address)));
+        }
 
         $customer_notes = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%; max-width: 308px;"]')->getNode(0)->childNodes->item(5)->textContent;
 
-        $order_tip = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(8)->textContent);
+        $order_tip = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(4)->textContent);
         $order_tip_type = (!is_numeric($order_tip[0])) ? 'cash' : "prepaid";
         $order_tip = ($order_tip_type === 'cash') ? '0.00' : $order_tip;
 
@@ -105,41 +110,52 @@ class ParserDelivery implements ParserInterface
             $order_type = 'cash';
         }
 
-        $customer_phone_number = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')
-            ->getNode(0)->childNodes->item(10)->textContent;
+        $customer_phone_number = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"] > span')
+            ->last()->text();
+
+        $order_note_payments = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(0)->textContent) . ' $' .
+            str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(0)->textContent) . '\n ' .
+            str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(2)->textContent) . ' $' .
+            str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(2)->textContent) . '\n ' .
+            str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(4)->textContent) . ' $' .
+            str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(4)->textContent) . '\n ';
+
+        if ((strpos($crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(2)->textContent, 'fee')) || (strpos($crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(2)->textContent, 'off'))) {
+            $order_note_payments .= str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(6)->textContent) . ' $' .
+                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(6)->textContent) . '\n ';
+        }
+
+        if (strpos($crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(4)->textContent, 'off')) {
+            $order_note_payments .= str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(8)->textContent) . ' $' .
+                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(8)->textContent) . '\n ';
+        }
+
+        $order_note_payments .= str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS" ] > span[style="font-weight: bold; font-size: 13px;"]')->text()) . ' $' .
+            str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"] > span[style="font-weight: bold; font-size: 13px;"]')->text()) . '\n';
 
         return [
             'provider_ext_code'   => str_replace(["\r", "\n"], '', preg_replace('#-.*#', '',
                 $crawler->filter('td[style="font-size: 12px;line-height: 13px;text-align: right; vertical-align: text-top;width: 415px; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #000;"]')
                 ->getNode(0)->firstChild->textContent)),
             'place'               => str_replace(["\r", "\n", '(Order placed: ', ')'], '', $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')
-                ->getNode(0)->childNodes->item(12)->textContent),
+                ->getNode(0)->childNodes->item(11)->textContent),
             'restaurant'          => str_replace(["\r", "\n"], '', preg_replace('#-.*#', '',
                 $crawler->filter('td[style="font-size: 12px;line-height: 13px;text-align: right; vertical-align: text-top;width: 415px; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #000;"]')
                 ->getNode(0)->firstChild->textContent)),
             'order_time'          => substr(str_replace(["\r", "\n", '(Order placed: ', ')'], '', $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')
-                ->getNode(0)->childNodes->item(12)->textContent), 0, 8),
+                ->getNode(0)->childNodes->item(11)->textContent), 0, 8),
             'customer_name'       => str_replace(["\r", "\n"], '', $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')
                 ->getNode(0)->childNodes->item(2)->textContent),
             'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_phone_number),
             'customer_address'    => $customer_address,
             'customer_notes'      => $customer_notes,
             'order_note'          => str_replace(["\r", "\n"], '', Helper::wordWrappingForNoteByDelivery($crawler
+                ->filter('table[id="ITEMS-TABLE"] > tr[style="min-height: 26px; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #000;"] > td'))) .
+                ' ' . str_replace(["\r", "\n"], '', Helper::wordWrappingForNoteByDelivery($crawler
                 ->filter('table[id="ITEMS-TABLE"] > tr[style="min-height: 26px; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: #000;"] > td'))),
             'order_tip'           => $order_tip,
             'order_price'         => str_replace('$', '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"] > span[style="font-weight: bold; font-size: 13px;"]')->text()),
-            'order_note_payments' => str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(0)->textContent) . ' $' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(0)->textContent) . '\n ' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(2)->textContent) . ' $' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(2)->textContent) . '\n ' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(4)->textContent) . ' $' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(4)->textContent) . '\n ' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(6)->textContent) . ' $' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(6)->textContent) . '\n ' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(8)->textContent) . ' $' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(8)->textContent) . '\n ' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS" ] > span[style="font-weight: bold; font-size: 13px;"]')->text()) . ' $' .
-                str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"] > span[style="font-weight: bold; font-size: 13px;"]')->text()) . '\n',
+            'order_note_payments' => $order_note_payments,
             'order_type'          => $order_type,
             'order_tip_type'      => $order_tip_type,
             'subj'                => $message->subject,

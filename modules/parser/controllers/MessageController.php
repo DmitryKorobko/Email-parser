@@ -28,7 +28,7 @@ class MessageController extends Controller
         try {
             $mailbox = new Mailbox(
                 '{' . Yii::$app->params['host'] . ':993/imap/ssl/novalidate-cert}',
-                Yii::$app->params['login'], Yii::$app->params['password'],  __DIR__
+                Yii::$app->params['login'], Yii::$app->params['password'],  __DIR__ . '/../../../runtime/attachments/'
             );
 
             $mailsIds = $mailbox->searchMailbox('ALL');

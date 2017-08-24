@@ -99,8 +99,7 @@ class ParserClorder implements ParserInterface
         $order_tip = str_replace('$', '',
             $crawler->filter('td[style="padding: 0 5pt 7.5pt 0; width: 400px"] > table > tbody')->children()
                 ->last()->children()->last()->text());
-        $order_tip_type = (($order_tip === 'cash') || ($order_tip === 'CASH') || ($order_tip === 'Cash') ||
-            ($order_tip === ' cash ') || ($order_tip === ' CASH ') || ($order_tip === ' Cash ')) ? 'cash' : "prepaid";
+        $order_tip_type = (strpos(mb_strtolower($order_tip), 'cash')) ? 'cash' : "prepaid";
         $order_tip = ($order_tip_type === 'cash') ? '0.00' : str_replace(' ', '', $order_tip);
 
         $order_type = 'prepaid';
@@ -140,6 +139,7 @@ class ParserClorder implements ParserInterface
             'order_number'        => $order_number,
             'message_body'        => $message->textHtml,
             'is_update'           => $is_update,
+            'order_api_id'        => ($is_update) ? $query->order_id : null,
             'confirmation_link'   => ''
         ];
     }

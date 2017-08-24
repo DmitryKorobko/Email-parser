@@ -60,14 +60,8 @@ $config = [
             'class' => \app\modules\parser\components\ApiClient::class
         ],
         'messageDispatcher' => [
-            'class' => \app\modules\parser\components\MessageDispatcher::class,
-            'parsers' => [
-                \app\modules\parser\services\ParserClorder::class,
-                \app\modules\parser\services\ParserEat24::class,
-                \app\modules\parser\services\ParserGrubhub::class,
-                \app\modules\parser\services\ParserEatStreet::class,
-                \app\modules\parser\services\ParserDelivery::class,
-            ]
+            'class'   => \app\modules\parser\components\MessageDispatcher::class,
+            'parsers' => $db = require(__DIR__ . '/parsers-local.php')
         ],
         'messageValidator' => [
             'class' => \app\modules\parser\validators\MessageValidator::class
