@@ -16,6 +16,7 @@ $config = [
     'basePath' => dirname(__DIR__),
     'bootstrap' => ['log'],
     'controllerNamespace' => 'app\commands',
+    'timeZone' => 'US/Pacific',
     'components' => [
         'cache' => [
             'class' => 'yii\caching\FileCache',
@@ -25,8 +26,8 @@ $config = [
                 [
                     'class'          => 'yii\log\FileTarget',
                     'levels'         => ['error', 'warning'],
+                    'categories' => ['parser'],
                     'logFile'        => '@app/runtime/logs/parser.log',
-                    'prefix'         => function () { return 'Parsing error - ';},
                     'exportInterval' => 1,
                     'maxFileSize'    => 1024 * 2,
                     'maxLogFiles'    => 20,
@@ -36,13 +37,13 @@ $config = [
                     'class'      => 'yii\log\EmailTarget',
                     'mailer'     => 'mailer',
                     'levels'     => ['error'],
-                    'prefix'         => function () { return 'Parsing error - ';},
+                    'categories' => ['parser'],
                     'message'    => [
                         'from'    => ['order@laxa24.com'],
                         'to'      => ['support@laxa24.com'],
-                        'subject' => 'parsing error',
+                        'subject' => 'Parsing Error',
                     ],
-                    'logVars'     => []
+                    'logVars'    => []
                 ],
             ],
         ],
@@ -59,11 +60,8 @@ $config = [
             'class' => \app\modules\parser\components\ApiClient::class
         ],
         'messageDispatcher' => [
-            'class' => \app\modules\parser\components\MessageDispatcher::class,
-            'parsers' => [
-                \app\modules\parser\services\ParserClorder::class,
-                \app\modules\parser\services\ParserMaitred::class,
-            ]
+            'class'   => \app\modules\parser\components\MessageDispatcher::class,
+            'parsers' => $db = require(__DIR__ . '/parsers-local.php')
         ],
         'messageValidator' => [
             'class' => \app\modules\parser\validators\MessageValidator::class

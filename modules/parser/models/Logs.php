@@ -13,6 +13,7 @@ use yii\db\ActiveRecord;
  * @property integer $id
  * @property string $subject
  * @property string $href
+ * @property string $html
  * @property string $unique_message_identifier
  * @property string $sender
  * @property integer $complete
@@ -21,6 +22,7 @@ use yii\db\ActiveRecord;
  * @property integer $updated_at
  * @property integer $order_id
  * @property string $message_error
+ * @property string $order_number
  */
 class Logs extends ActiveRecord
 {
@@ -63,7 +65,7 @@ class Logs extends ActiveRecord
                 'required',
                 'on' => [self::SCENARIO_CREATE, self::SCENARIO_UPDATE]
             ],
-            [['unique_message_identifier', 'sender', 'message_error', 'href'], 'string'],
+            [['unique_message_identifier', 'sender', 'message_error', 'href', 'order_number'], 'string'],
             [[ 'created_at', 'updated_at', 'complete', 'order_id'], 'integer'],
         ];
     }
@@ -75,10 +77,13 @@ class Logs extends ActiveRecord
      * @param $complete
      * @param $messageError
      * @param $data
+     * @param $html
      * @return bool
      */
-    public static function recordLog($message, $complete, $messageError, $data)
+    public static function recordLog($message, $complete, $messageError, $data, $html = null)
     {
+        $order_number = str_replace('order_number=', '', stristr(stristr($data['href'], 'order_number='),'&', true));
+
         $logs = new self();
         $logs->setScenario(self::SCENARIO_CREATE);
         $data = [
@@ -89,11 +94,39 @@ class Logs extends ActiveRecord
             'message_date'              => strtotime($message->date),
             'order_id'                  => (isset($data['orderId'])) ? $data['orderId'] : null,
             'href'                      => (isset($data['href'])) ? $data['href'] : null,
-            'message_error'             => $messageError
+            'html'                      => $html,
+            'message_error'             => $messageError,
+            'order_number'              => $order_number
         ];
 
         $logs->setAttributes($data, false);
 
         return $logs->save();
     }
+
+    /**
+     * @param $order_number
+     * @return bool
+     */
+    public static function getLogsByOrderNumber($order_number)
+    {
+        /* @var $query Logs.php */
+        $query = self::find()->where(['complete' => 1])->andWhere(['like', 'order_number', $order_number])->one();
+        $timeForUpdate = ((!empty($query))) ? ((time() - $query->created_at)/60) : 30;
+        return ((!empty($query)) && ($timeForUpdate < 30)) ? true : false;
+    }
+
+    /**
+     * Get order_id of log by order_number
+     *
+     * @param $order_number
+     * @param $is_update
+     * @return int|null
+     */
+    public static function getLogOrderId($order_number, $is_update)
+    {
+        $query = self::findOne(['order_number' => $order_number]);
+        return ($is_update) ? $query->order_id : null;
+    }
 }
+
