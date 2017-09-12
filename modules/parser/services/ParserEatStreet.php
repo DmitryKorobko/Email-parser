@@ -98,6 +98,7 @@ class ParserEatStreet implements ParserInterface
 
         $customer_address = str_replace(' Apt:', ',', $customer_address);
         $customer_address = str_replace('Apt:', ',', $customer_address);
+        $customer_address = str_replace(["\r", "\n", '#', '№'], '', $customer_address);
 
         $order_tip = trim($crawler->filter('div#page')->children()->getNode(16)->getElementsByTagName('td')
             ->item(12)->textContent);
@@ -106,6 +107,7 @@ class ParserEatStreet implements ParserInterface
         $order_tip = ($order_tip_type === 'cash') ? '0.00' : $order_tip;
 
         $order_type = 'prepaid';
+
         if (!stripos($crawler->filter('div#orderInfo')->text(), 'paid')) {
             $order_type = 'cash';
         }

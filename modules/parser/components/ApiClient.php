@@ -152,6 +152,8 @@ class ApiClient extends Component
 
         $url .= '&order_number=' . $data['order_number'];
         $url .= '&confirmation_link=' . $data['confirmation_link'];
+        $url .= '&order_note=' . $data['order_note'];
+        $url .= '&order_note_payments=' . $data['order_note_payments'];
 
         return $url;
     }

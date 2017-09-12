@@ -89,15 +89,35 @@ class ParserEat24 implements ParserInterface
         $crawler = new Crawler($html);
 
         $customer_address = $crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(0)->textContent . ', '
-            . $crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(1)->textContent . ', '
             . $crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(2)->textContent;
 
-        $customer_address = str_replace('#', '', str_replace(', , ', ', ', $customer_address));
+        $address_note = '';
 
+        if (!empty($crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(1)->textContent)) {
+            if ($crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(1)->textContent !== '') {
+                $address_note .= $crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(1)->textContent . ', ';
+            }
+
+        }
+
+        if (!empty($crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(3)->textContent)) {
+            if ($crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(3)->textContent !== '') {
+                $address_note .= $crawler->filter('div[style="font-size: 12pt; margin-bottom: 5px;"] > div')->getNode(3)->textContent . ', ';
+            }
+        }
+
+        $customer_address = str_replace('#', '', str_replace(', , ', ', ', $customer_address));
+        $customer_address = str_replace(["\r", "\n", '#', '№'], '', $customer_address);
         $customer_notes = '';
+
+        if ($address_note !== '') {
+            $customer_notes .= $address_note;
+        }
+
         $customer_notes_count = $crawler->filter('td[style="font-size: 14pt; padding:20px 0 20px 15px; vertical-align:top"]')->count();
+
         if ($customer_notes_count) {
-            $customer_notes = preg_replace('/\s{2}/', '',
+            $customer_notes .= preg_replace('/\s{2}/', '',
                 $crawler->filter('td[style="font-size: 14pt; padding:20px 0 20px 15px; vertical-align:top"]')->children()->last()->text());
         }
 
@@ -108,12 +128,18 @@ class ParserEat24 implements ParserInterface
         $order_tip = ($order_tip_type === 'cash') ? '0.00' : $order_tip;
 
         $order_type = 'prepaid';
+
         if (!stripos($crawler->filter('div[style="width:150px; padding:8px; border:1px solid black"] div b')->text(),
             'PAID')) {
             $order_type = 'cash';
         }
 
         $customer_phone_number = $crawler->filter('table[style="width: 100%; border-spacing: 0;"] td[style="text-align: right;"]')->text();
+
+        $order_number = $crawler->filter('div[style="width: 100%; background:#ffffff;"] div[style="padding:3px 0"] > b')->text();
+        $is_update = Logs::getLogsByOrderNumber($order_number);
+        $order_note = Helper::wordWrappingforNote($crawler->filter('table[style="border-bottom:2px solid black"]')->children());
+        $order_note_payments = Helper::wordWrappingForPayments($crawler->filter('table[style="padding:0 0 10px; font-size:12pt"] tr')->children()->last()->text());
 
         return [
             'provider_ext_code'   => preg_replace('#-.*#', '', $crawler->filter('div[style="width: 100%; background:#ffffff;"]
@@ -122,23 +148,24 @@ class ParserEat24 implements ParserInterface
                 ->children()->last()->text(),
             'phobulous'           => $crawler->filter('div[style="width: 100%; background:#ffffff;"] td[style="font-size:12pt"]')
                 ->children()->first()->text(),
-            'delivery'            => $crawler->filter('table[style="padding:10px 12px; border:1px solid black"]
-                td[style="font-size:30pt; text-transform:uppercase"] > b')->text(),
+            'delivery'            => trim($crawler->filter('table[style="padding:10px 12px; border:1px solid black"]')
+                ->children()->first()->children()->last()->text()),
             'customer_name'       => trim($crawler->filter('table[style="width: 100%; border-spacing: 0;"] td[style="word-break: break-word;"]')->text()),
             'customer_phone_num'  => Helper::deleteNaNFromTelNum($customer_phone_number),
             'customer_address'    => $customer_address,
             'customer_notes'      => $customer_notes,
-            'order_note'          => Helper::wordWrappingforNote($crawler->filter('table[style="border-bottom:2px solid black"]')->children()),
+            'order_note'          => $order_note,
             'order_tip'           => str_replace(' ', '', $order_tip),
             'order_price'         => str_replace('$', '', $crawler->filter('tr td[style="padding:4px 0; vertical-align:top"] td[style="font-size:14pt"]')->text()),
-            'order_note_payments' => Helper::wordWrappingForPayments($crawler->filter('table[style="padding:0 0 10px; font-size:12pt"] tr')->children()->last()->text()),
+            'order_note_payments' => $order_note_payments,
             'order_type'          => $order_type,
             'order_tip_type'      => $order_tip_type,
             'subj'                => $message->subject,
             'sender'              => $message->fromAddress,
-            'order_number'        => $crawler->filter('div[style="width: 100%; background:#ffffff;"] div[style="padding:3px 0"] > b')->text(),
+            'order_number'        => $order_number,
             'message_body'        => $message->textHtml,
-            'is_update'           => false,
+            'is_update'           => $is_update,
+            'order_api_id'        => Logs::getLogOrderId($order_number, $is_update),
             'confirmation_link'   => $crawler->filter('div[style="margin-bottom:10px; padding:17px 0; background:#0e83cd; font-size:14pt; text-align:center"] > a')->extract(['href'])[0]
         ];
     }

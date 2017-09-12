@@ -90,7 +90,7 @@ class ParserDelivery implements ParserInterface
 
         $customer_address = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(5)->textContent . ', ' .
             $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(7)->textContent;
-        $customer_address = str_replace(["\r", "\n", '#'], '', str_replace(', , ', ', ', str_replace(' ,', ',', $customer_address)));
+        $customer_address = str_replace(["\r", "\n", '#', '№'], '', str_replace(', , ', ', ', str_replace(' ,', ',', $customer_address)));
 
         if (strlen($customer_address) < 20) {
             $customer_address = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%;"]')->getNode(0)->childNodes->item(6)->textContent . ', ' .
@@ -98,13 +98,11 @@ class ParserDelivery implements ParserInterface
             $customer_address = str_replace(["\r", "\n", '#'], '', str_replace(', , ', ', ', str_replace(' ,', ',', $customer_address)));
         }
 
-        $customer_notes = $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%; max-width: 308px;"]')->getNode(0)->childNodes->item(5)->textContent;
-
-        $order_tip = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(4)->textContent);
-        $order_tip_type = (!is_numeric($order_tip[0])) ? 'cash' : "prepaid";
-        $order_tip = ($order_tip_type === 'cash') ? '0.00' : $order_tip;
+        $customer_notes = (!empty($crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%; max-width: 308px;"]')->getNode(0)->childNodes->item(5)->textContent)) ?
+            $crawler->filter('tr[id="CUSTOMER-INFO-AND-SPECIAL-INSTRUCTIONS"] > td[style="width: 50%; max-width: 308px;"]')->getNode(0)->childNodes->item(5)->textContent : '';
 
         $order_type = 'prepaid';
+
         if (stripos($crawler->filter('span[style="font-size: 17px; font-weight: bold; text-align: center;"]')->text(),
             'cash')) {
             $order_type = 'cash';
@@ -120,15 +118,22 @@ class ParserDelivery implements ParserInterface
             str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(4)->textContent) . ' $' .
             str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(4)->textContent) . '\n ';
 
+        $order_tip = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(4)->textContent);
+
         if ((strpos($crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(2)->textContent, 'fee')) || (strpos($crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(2)->textContent, 'off'))) {
             $order_note_payments .= str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(6)->textContent) . ' $' .
                 str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(6)->textContent) . '\n ';
+            $order_tip = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(6)->textContent);
         }
 
         if (strpos($crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(4)->textContent, 'off')) {
             $order_note_payments .= str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS"]')->getNode(0)->childNodes->item(8)->textContent) . ' $' .
                 str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(8)->textContent) . '\n ';
+            $order_tip = str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"]')->getNode(0)->childNodes->item(8)->textContent);
         }
+
+        $order_tip_type = (!is_numeric($order_tip[0])) ? 'cash' : "prepaid";
+        $order_tip = ($order_tip_type === 'cash') ? '0.00' : $order_tip;
 
         $order_note_payments .= str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-LABELS" ] > span[style="font-weight: bold; font-size: 13px;"]')->text()) . ' $' .
             str_replace(["\r", "\n", '$'], '', $crawler->filter('td[id="MERCHANT-RECEIVES-VALUES"] > span[style="font-weight: bold; font-size: 13px;"]')->text()) . '\n';

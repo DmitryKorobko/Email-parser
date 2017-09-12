@@ -187,4 +187,36 @@ class Helper
 
         return $result;
     }
+
+    /** Method of transferring words to a new line
+     *
+     * @param $str
+     * @return string
+     */
+    public static function wordWrappingForNoteByChowNow($str)
+    {
+        $table = [];
+        foreach ($str as $item) {
+            if ($item->textContent !== "") {
+                $table[] = str_replace(["\r", "\n", '  '], '', $item->textContent);
+            }
+        }
+
+        $lengthOfArray = count($table);
+        $result ='';
+
+        for ($i = 0; $i < $lengthOfArray; $i++) {
+            if (is_numeric($table[$i])) {
+                $result .= ' Qty: ' . $table[$i] . ' Item: ' . $table[$i + 1] . ' ' . $table[$i + 2];
+                $result .= (!empty($table[$i+4]) && !is_numeric($table[$i+4])) ? ' ' . $table[$i+4] : '';
+                $result .= ' Price: ' . $table[$i + 3] . ' \n';
+            }
+
+            if (($i + 4) <= $lengthOfArray) {
+                $i += 3;
+            }
+        }
+
+        return $result;
+    }
 }

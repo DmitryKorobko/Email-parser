@@ -103,4 +103,30 @@ class Logs extends ActiveRecord
 
         return $logs->save();
     }
+
+    /**
+     * @param $order_number
+     * @return bool
+     */
+    public static function getLogsByOrderNumber($order_number)
+    {
+        /* @var $query Logs.php */
+        $query = self::find()->where(['complete' => 1])->andWhere(['like', 'order_number', $order_number])->one();
+        $timeForUpdate = ((!empty($query))) ? ((time() - $query->created_at)/60) : 30;
+        return ((!empty($query)) && ($timeForUpdate < 30)) ? true : false;
+    }
+
+    /**
+     * Get order_id of log by order_number
+     *
+     * @param $order_number
+     * @param $is_update
+     * @return int|null
+     */
+    public static function getLogOrderId($order_number, $is_update)
+    {
+        $query = self::findOne(['order_number' => $order_number]);
+        return ($is_update) ? $query->order_id : null;
+    }
 }
+
